@@ -9,6 +9,7 @@ const { PortalSession } = require("../lib/portal/session");
 const { loadMapping, resolveNationality } = require("../lib/data/nationality");
 const { searchAll, toPortalDate, travellersAges } = require("../lib/portal/search");
 const { HotelNotFound, getHotelQuote } = require("../lib/portal/hotel");
+const { applyMarkup } = require("../lib/pricing");
 const { HttpError, parseChildAges, parseDateParam, parseIntParam } = require("../lib/api/common");
 
 const portal = new PortalSession({
@@ -100,8 +101,11 @@ app.get("/search", async (req, res) => {
       resort: req.query.resort ?? null,
     });
     const start = (page - 1) * perPage;
+    const marked = rows
+      .slice(start, start + perPage)
+      .map((r) => ({ ...r, net_price: applyMarkup(r.net_price, config.markup) }));
     res.json({
-      results: rows.slice(start, start + perPage),
+      results: marked,
       page,
       per_page: perPage,
       total: rows.length,
@@ -132,6 +136,9 @@ app.get("/hotels/:hotelId", async (req, res) => {
       nationalityId: b.nationalityId,
       rateCode: config.portalRateCode,
     });
+    for (const room of quote.rooms) {
+      room.net_price = applyMarkup(room.net_price, config.markup);
+    }
     res.json(quote);
   } catch (err) {
     sendError(res, err);

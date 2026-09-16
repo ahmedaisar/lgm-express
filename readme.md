@@ -55,4 +55,5 @@ Behind a TLS-inspecting local network, Node honors the standard escape hatch
 
 Otherwise behavior is identical: shared-session login with verified probe,
 dash-joined search ages / comma-joined skeleton ages, slug-only hotel routes,
-`no_results` envelopes, 404/422/502 semantics.
+`no_results` envelopes, 404/422/502 semantics. Room net prices carry `MARKUP`
+(default 10%); transfers are never marked up.
