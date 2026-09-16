@@ -1,0 +1,20 @@
+{
+  "name": "lgm-rate-proxy-express",
+  "version": "0.1.0",
+  "description": "Lets Go Maldives Rate Proxy API — Express port (Vercel-shaped)",
+  "type": "commonjs",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js",
+    "dev": "node api/index.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
