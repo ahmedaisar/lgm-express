@@ -16,6 +16,7 @@ const csv = require("../lib/cms/csv");
 const merge = require("../lib/cms/merge");
 const admin = require("../lib/auth/admin");
 const multer = require("multer");
+const cors = require("cors");
 const { HttpError, parseChildAges, parseDateParam, parseIntParam } = require("../lib/api/common");
 
 const portal = new PortalSession({
@@ -30,6 +31,7 @@ const portal = new PortalSession({
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json());
+app.use(cors({ origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : true }));
 
 app.use((req, res, next) => {
   const start = Date.now();
