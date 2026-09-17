@@ -3,6 +3,7 @@
 require("dotenv").config();
 
 const express = require("express");
+const path = require("path");
 const config = require("../lib/config");
 const log = require("../lib/log");
 const { PortalSession } = require("../lib/portal/session");
@@ -10,6 +11,11 @@ const { loadMapping, resolveNationality } = require("../lib/data/nationality");
 const { searchAll, toPortalDate, travellersAges } = require("../lib/portal/search");
 const { HotelNotFound, getHotelQuote } = require("../lib/portal/hotel");
 const { applyMarkup } = require("../lib/pricing");
+const store = require("../lib/cms/store");
+const csv = require("../lib/cms/csv");
+const merge = require("../lib/cms/merge");
+const admin = require("../lib/auth/admin");
+const multer = require("multer");
 const { HttpError, parseChildAges, parseDateParam, parseIntParam } = require("../lib/api/common");
 
 const portal = new PortalSession({
@@ -104,8 +110,9 @@ app.get("/search", async (req, res) => {
     const marked = rows
       .slice(start, start + perPage)
       .map((r) => ({ ...r, net_price: applyMarkup(r.net_price, config.markup) }));
+    const enriched = merge.enrichSearchRows(marked, store.list());
     res.json({
-      results: marked,
+      results: enriched,
       page,
       per_page: perPage,
       total: rows.length,
@@ -139,11 +146,98 @@ app.get("/hotels/:hotelId", async (req, res) => {
     for (const room of quote.rooms) {
       room.net_price = applyMarkup(room.net_price, config.markup);
     }
-    res.json(quote);
+    res.json(merge.enrichQuote(quote, store.list()));
   } catch (err) {
     sendError(res, err);
   }
 });
+
+// ---- Admin CMS (Bearer JWT, see lib/auth/admin.js) ----
+app.post("/admin/login", admin.loginHandler);
+
+app.get("/admin/hotels", admin.requireAdmin, (req, res) => {
+  try {
+    res.json(store.list());
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.post("/admin/hotels", admin.requireAdmin, (req, res) => {
+  try {
+    res.status(201).json(store.create(req.body || {}));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.get("/admin/hotels/:id", admin.requireAdmin, (req, res) => {
+  try {
+    const rec = store.get(req.params.id);
+    if (!rec) return res.status(404).json({ detail: `CMS hotel ${JSON.stringify(req.params.id)} not found` });
+    res.json(rec);
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.put("/admin/hotels/:id", admin.requireAdmin, (req, res) => {
+  try {
+    const rec = store.update(req.params.id, req.body || {});
+    if (!rec) return res.status(404).json({ detail: `CMS hotel ${JSON.stringify(req.params.id)} not found` });
+    res.json(rec);
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.delete("/admin/hotels/:id", admin.requireAdmin, (req, res) => {
+  try {
+    if (!store.remove(req.params.id)) {
+      return res.status(404).json({ detail: `CMS hotel ${JSON.stringify(req.params.id)} not found` });
+    }
+    res.json({ deleted: req.params.id });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+app.post("/admin/import", admin.requireAdmin, upload.single("file"), (req, res) => {
+  try {
+    if (!req.file) return res.status(422).json({ detail: "multipart field 'file' (.csv) is required" });
+    if (!/\.csv$/i.test(req.file.originalname || "")) {
+      return res.status(422).json({ detail: "only .csv uploads are accepted" });
+    }
+    res.json(csv.importCsv(req.file.buffer.toString("utf-8")));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.get("/admin/export", admin.requireAdmin, (req, res) => {
+  try {
+    res.set("Content-Type", "text/csv; charset=utf-8");
+    res.set("Content-Disposition", 'attachment; filename="cms-export.csv"');
+    res.send(csv.toCsv(store.list()));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Admin UI (static SPA; data calls carry the Bearer token).
+// Mounted after the /admin/* API routes so they match first.
+// NOTE: plain "/admin" matches "/admin/" too (non-strict routing), so only
+// redirect the slash-less form or /admin/ loops forever.
+app.get("/admin", (req, res, next) => {
+  if (req.path === "/admin") return res.redirect("/admin/");
+  return next();
+});
+app.use("/admin", express.static(path.join(__dirname, "..", "public", "admin")));
 
 // Vercel (serverless import) vs direct run.
 if (require.main === module) {

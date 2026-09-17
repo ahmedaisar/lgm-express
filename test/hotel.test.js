@@ -20,8 +20,10 @@ describe("nationality mapping", () => {
 describe("hotel template parsing", () => {
   const PAGE = `<html><body><h1>Sun Resort</h1>
     <form><input type="hidden" name="csrfmiddlewaretoken" value="pagetok"></form>
-    <script>var supplier_company_id = '10638', hotel_id = '11',
-    room_ajax_url = "/hotel/book/load-hotel-data/sun-resort/";</script>
+    <script>var supplier_company_id = '10638', hotel_id = '11', rate_code_id = '180',
+    hotel_supplier_id = '1794155',
+    room_ajax_url = "/hotel/book/load-hotel-data/sun-resort/",
+    load_bonuses_url = "/hotel/book/load-bonuses/";</script>
     </body></html>`;
 
   const TEMPLATE = `
@@ -53,7 +55,9 @@ describe("hotel template parsing", () => {
     const ctx = parseHotelPage(PAGE, "sun-resort");
     assert.equal(ctx.hotel_id, "11");
     assert.equal(ctx.supplier_company_id, "10638");
+    assert.equal(ctx.rate_code_id, "180");
     assert.equal(ctx.room_ajax_url, "/hotel/book/load-hotel-data/sun-resort/");
+    assert.equal(ctx.load_bonuses_url, "/hotel/book/load-bonuses/");
     assert.equal(ctx.csrf_token, "pagetok");
     assert.equal(ctx.hotel_name, "Sun Resort");
   });
@@ -61,7 +65,7 @@ describe("hotel template parsing", () => {
   it("parseHotelTemplate reads rooms and transfers", () => {
     const { rooms, transfers } = parseHotelTemplate(TEMPLATE);
     assert.equal(rooms.length, 1);
-    const { cancellation_policy, room_features, ...rest } = rooms[0];
+    const { cancellation_policy, room_features, hotel_supplier_id, ...rest } = rooms[0];
     assert.deepEqual(rest, {
       room_name: "Beach Villa",
       meal_plan: "BB",

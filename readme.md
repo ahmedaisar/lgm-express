@@ -27,6 +27,45 @@ curl "localhost:8000/hotels/sun-resort?date_start=2026-10-01&date_end=2026-10-05
 
 `npm test` runs the unit suite (`node:test`, no extra deps).
 
+## Hotel CMS (internal)
+
+Minimal content backend for what the portal doesn't provide (photos,
+descriptions, amenities). One CMS Hotel links to one Portal Hotel via
+`portal_hotel_id` (numeric portal id; `portal_slug` kept as a convenience
+copy) — links are made by hand, never guessed. Public `/search` rows and
+`/hotels/:id` gain `cms: {...}`, or `cms: null` when unmapped.
+
+Storage is `data/cms.json`, committed to the repo. Writes are atomic;
+local/VPS keeps them, Vercel keeps them only until the next deploy (then the
+last-committed file returns) — commit after big imports.
+
+Admin (single role): set `ADMIN_USER`/`ADMIN_PASSWORD`/`ADMIN_JWT_SECRET`,
+then open **`GET /admin/`** — a Tailwind admin UI (login, hotel table with
+filter, add/edit form, CSV import/export, delete). It calls the same JSON
+endpoints below with a Bearer token; without admin env the UI's login answers
+503 and the public API is unaffected.
+
+```bash
+curl -X POST localhost:8000/admin/login -H 'Content-Type: application/json' \
+  -d '{"user":"boss","password":"s3cret"}'            # -> {"token":"..."}
+T=...  # the token
+curl -X POST localhost:8000/admin/hotels -H "Authorization: Bearer $T" \
+  -H 'Content-Type: application/json' -d '{
+    "name": "Sun Resort", "atoll": "Male Atoll", "stars": 5,
+    "photos": ["https://.../a.jpg"], "amenities": ["wifi", "spa"],
+    "portal_hotel_id": "11", "portal_slug": "sun-resort"}'
+curl "localhost:8000/admin/hotels" -H "Authorization: Bearer $T"
+curl -X PUT localhost:8000/admin/hotels/sun-resort -H "Authorization: Bearer $T" \
+  -H 'Content-Type: application/json' -d '{"description": "Beach fun"}'
+# bulk: columns id,name,description,atoll,stars,photos,amenities,website,portal_hotel_id,portal_slug
+curl -X POST localhost:8000/admin/import -H "Authorization: Bearer $T" \
+  -F "file=@hotels.csv"                               # -> {created, updated, errors[]}
+curl "localhost:8000/admin/export" -H "Authorization: Bearer $T" -o cms-export.csv
+```
+
+`photos`/`amenities` accept `|`-separated strings or arrays. Import upserts by
+`id`, then `portal_hotel_id`, else creates (blank cells never wipe on update).
+
 ## Deploy to Vercel
 
 ```bash
