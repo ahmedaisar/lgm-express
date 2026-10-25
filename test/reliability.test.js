@@ -160,12 +160,12 @@ describe("reliability http surface", () => {
     assert.ok(res.headers.get("ratelimit-limit"), "missing RateLimit-Limit header");
   });
 
-  it("agent Bearer passes rates auth without a shared key", async () => {
+  it("admin bearer does not bypass ordinary search input validation", async () => {
     const res = await fetch(
       `${base}/search?date_start=2026-10-01&date_end=2026-10-05&adults=2&nationality=Atlantis`,
       { headers: { Authorization: `Bearer ${adminToken}` } }
     );
-    assert.equal(res.status, 422); // authed as agent (stubbed), validation rejected
+    assert.equal(res.status, 422);
   });
 
   it("admin list stays an array by default, envelopes with ?page=", async () => {
