@@ -237,7 +237,14 @@ app.post("/admin/login", admin.loginHandler);
 
 app.get("/admin/hotels", admin.requireAdmin, (req, res) => {
   try {
-    res.json(store.list());
+    const records = store.list();
+    const queried = store.query(records, {
+      q: req.query.q,
+      atoll: req.query.atoll,
+      page: req.query.page,
+      per_page: req.query.per_page,
+    });
+    res.json(queried);
   } catch (err) {
     sendError(res, err);
   }
