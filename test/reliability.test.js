@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { describe, it, before } = require("node:test");
+const { describe, it, before, after } = require("node:test");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -87,6 +87,9 @@ describe("reliability http surface", () => {
   let adminToken;
 
   before(async () => {
+    process.env.ADMIN_USER = "reliability-admin";
+    process.env.ADMIN_PASSWORD = "reliability-password";
+    process.env.ADMIN_JWT_SECRET = "reliability-test-jwt-secret-long-enough";
     process.env.API_KEYS = "rel-key";
     process.env.RATE_LIMIT_MAX = "1000";
     process.env.SEARCH_CACHE_TTL_MS = "0";
@@ -100,18 +103,17 @@ describe("reliability http surface", () => {
       fs.mkdtempSync(path.join(os.tmpdir(), "cmshttp-")),
       "cms.json"
     );
-    // Supabase-admin guard with stubbed identity (no network): every Bearer
-    // token maps to an active admin.
-    const guard = require("../lib/auth/supabaseAdmin");
-    guard._overrides.verify = () => ({ sub: "admin-1" });
-    guard._overrides.fetchProfile = async () => ({
-      id: "admin-1", email: "owner@example.com", role: "admin", status: "active",
-    });
-    adminToken = "stubbed-admin-token";
     app = require("../api/index.js");
     server = app.listen(0);
     await new Promise((r) => server.on("listening", r));
     base = `http://127.0.0.1:${server.address().port}`;
+    const login = await fetch(`${base}/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: "reliability-admin", password: "reliability-password" }),
+    });
+    assert.equal(login.status, 200);
+    adminToken = (await login.json()).token;
     for (const name of ["Alpha Hotel", "Beta Hotel", "Gamma Hotel"]) {
       const r = await fetch(`${base}/admin/hotels`, {
         method: "POST",
@@ -177,6 +179,9 @@ describe("reliability http surface", () => {
     const q = await (await fetch(`${base}/admin/hotels?q=beta`, { headers: h })).json();
     assert.equal(q.length, 1);
     assert.equal(q[0].name, "Beta Hotel");
-    server.close();
+  });
+
+  after(async () => {
+    if (server) await new Promise((resolve) => server.close(resolve));
   });
 });
