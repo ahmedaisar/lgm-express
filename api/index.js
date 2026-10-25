@@ -4,6 +4,9 @@ require("dotenv").config();
 
 const express = require("express");
 const path = require("path");
+const helmet = require("helmet");
+const cors = require("cors");
+const rateLimit = require("express-rate-limit");
 const config = require("../lib/config");
 const log = require("../lib/log");
 const { PortalSession } = require("../lib/portal/session");
@@ -29,7 +32,47 @@ const portal = new PortalSession({
 
 const app = express();
 app.disable("x-powered-by");
-app.use(express.json());
+app.use(helmet());
+app.use(express.json({ limit: "1mb" }));
+
+// Explicit origin allowlist. Requests without Origin (server-to-server clients)
+// are permitted; browser origins are reflected only when allowlisted.
+const allowedOrigins = new Set(
+  String(process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  credentials: false,
+}));
+
+// In-memory per-instance limits provide a basic guard on serverless deployments.
+// Configure durable edge-level limits as well if the service is public.
+const apiLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) > 0
+    ? Number(process.env.RATE_LIMIT_WINDOW_MS) : 60_000,
+  limit: Number(process.env.RATE_LIMIT_MAX) > 0
+    ? Number(process.env.RATE_LIMIT_MAX) : 120,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { detail: "Too many requests; please retry later" },
+});
+app.use(apiLimiter);
+
+app.use((req, res, next) => {
+  const incomingId = String(req.get("X-Request-Id") || "").trim();
+  const requestId = /^[A-Za-z0-9._:-]{1,128}$/.test(incomingId)
+    ? incomingId
+    : require("crypto").randomUUID();
+  res.set("X-Request-Id", requestId);
+  req.requestId = requestId;
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -51,7 +94,12 @@ function sendError(res, err) {
     return res.status(404).json({ detail: err.message });
   }
   log.warn("portal upstream error: %s", err.message || err);
-  return res.status(502).json({ detail: `portal request failed: ${err.message || err}` });
+  // Do not pass upstream response bodies, credentials, URLs, or network errors
+  // through to callers. The full failure belongs in server-side logs.
+  return res.status(502).json({
+    detail: "Portal request failed",
+    request_id: res.get("X-Request-Id"),
+  });
 }
 
 function bookingParams(req) {
@@ -73,6 +121,38 @@ function bookingParams(req) {
     nationalityId,
   };
 }
+
+app.get("/openapi.json", (req, res) => {
+  res.json({
+    openapi: "3.0.3",
+    info: { title: "LGM Rate Proxy API", version: "0.2.0" },
+    paths: {
+      "/health": { get: { summary: "Application liveness" } },
+      "/health/ready": { get: { summary: "Application readiness" } },
+      "/health/portal": { get: { summary: "Portal connectivity" } },
+      "/search": { get: { summary: "Search hotel availability" } },
+      "/hotels/{hotelId}": { get: { summary: "Get hotel quote" } },
+      "/admin/login": { post: { summary: "Administrator login" } },
+      "/admin/hotels": {
+        get: { summary: "List CMS hotels" },
+        post: { summary: "Create a CMS hotel" },
+      },
+    },
+  });
+});
+
+app.get("/health/ready", (req, res) => {
+  try {
+    const hotels = store.list();
+    const mapping = loadMapping();
+    const mappingCountries = mapping && typeof mapping === "object"
+      ? Object.keys(mapping).length : 0;
+    res.json({ status: "ok", cms_hotels: hotels.length, mapping_countries: mappingCountries });
+  } catch (err) {
+    log.warn("readiness check failed: %s", err.message || err);
+    res.status(503).json({ status: "unready" });
+  }
+});
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", ...portal.status() });
