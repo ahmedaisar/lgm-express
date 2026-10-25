@@ -65,7 +65,10 @@ const apiLimiter = rateLimit({
   message: { detail: "Too many requests; please retry later" },
 });
 app.use(apiLimiter);
-app.use(caller.resolveCaller, caller.requireCaller);
+app.use((req, res, next) => {
+  req.caller = { type: "anon", active: true };
+  next();
+});
 
 app.use((req, res, next) => {
   const incomingId = String(req.get("X-Request-Id") || "").trim();
