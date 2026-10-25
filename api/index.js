@@ -113,7 +113,12 @@ function bookingParams(req) {
   const childs = parseIntParam(req.query.childs, 0, { min: 0, max: 10, name: "childs" });
   const childAges = parseChildAges(req.query.child_ages ?? null, childs);
   if (!req.query.nationality) throw new HttpError(422, "nationality is required");
-  const nationalityId = resolveNationality(req.query.nationality, loadMapping());
+  let nationalityId;
+  try {
+    nationalityId = resolveNationality(req.query.nationality, loadMapping());
+  } catch (err) {
+    throw new HttpError(422, err.message);
+  }
   return {
     portalStart: toPortalDate(dateStart),
     portalEnd: toPortalDate(dateEnd),
