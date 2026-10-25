@@ -7,6 +7,8 @@ const path = require("path");
 const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
+const caller = require("../lib/auth/caller");
+const supabaseAdmin = require("../lib/auth/supabaseAdmin");
 const config = require("../lib/config");
 const log = require("../lib/log");
 const { PortalSession } = require("../lib/portal/session");
@@ -63,6 +65,7 @@ const apiLimiter = rateLimit({
   message: { detail: "Too many requests; please retry later" },
 });
 app.use(apiLimiter);
+app.use(caller.resolveCaller, caller.requireCaller);
 
 app.use((req, res, next) => {
   const incomingId = String(req.get("X-Request-Id") || "").trim();
