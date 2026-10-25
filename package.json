@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node api/index.js",
     "dev": "node api/index.js",
-    "test": "node --test \"test/*.test.js\"",
+    "test": "node --test",
     "load": "node test/load-smoke.js"
   },
   "dependencies": {
@@ -23,6 +23,6 @@
     "papaparse": "^5.7.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   }
 }
