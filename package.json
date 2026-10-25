@@ -1,18 +1,23 @@
 {
   "name": "lgm-rate-proxy-express",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lets Go Maldives Rate Proxy API — Express port (Vercel-shaped)",
   "type": "commonjs",
   "main": "api/index.js",
   "scripts": {
     "start": "node api/index.js",
     "dev": "node api/index.js",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "load": "node test/load-smoke.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
     "cheerio": "^1.0.0",
+    "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-rate-limit": "^7.0.0",
+    "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
     "papaparse": "^5.7.0"

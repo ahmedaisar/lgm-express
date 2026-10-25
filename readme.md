@@ -1,5 +1,7 @@
 # LGM Rate Proxy — Express port
 
+[![AI-Ready](https://img.shields.io/badge/AI--Ready-✓-2ea44f?style=flat)](https://github.com/johnpapa/ai-ready)
+
 Node.js/Express port of the Lets Go Maldives Rate Proxy API (`../lgm`),
 shaped for Vercel serverless deployment. Same two endpoints over the same
 portal AJAX contract (see `../lgm/docs/ADR-001-integration-approach.md`):
@@ -96,3 +98,13 @@ Otherwise behavior is identical: shared-session login with verified probe,
 dash-joined search ages / comma-joined skeleton ages, slug-only hotel routes,
 `no_results` envelopes, 404/422/502 semantics. Room net prices carry `MARKUP`
 (default 10%); transfers are never marked up.
+
+## Contributing
+
+1. `git checkout -b feat/<short-name>` off `master`.
+2. Make the change. Node 18+, CommonJS, no new dependencies without a reason.
+3. Run `npm test` before pushing.
+4. Open a pull request against `master`; the template lists the checklist.
+
+Conventions, the maintenance matrix, and the merge boundary live in
+[`AGENTS.md`](./AGENTS.md).
