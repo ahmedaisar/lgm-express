@@ -8,7 +8,6 @@ const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const caller = require("../lib/auth/caller");
-const supabaseAdmin = require("../lib/auth/supabaseAdmin");
 const config = require("../lib/config");
 const log = require("../lib/log");
 const { PortalSession } = require("../lib/portal/session");
@@ -248,8 +247,7 @@ app.post("/admin/login", admin.loginHandler);
 
 app.get("/admin/hotels", admin.requireAdmin, (req, res) => {
   try {
-    const records = store.list();
-    const queried = store.query(records, {
+    const queried = store.query(store.list(), {
       q: req.query.q,
       atoll: req.query.atoll,
       page: req.query.page,
